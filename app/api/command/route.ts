@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAccounts, addEvent, sendWebhook } from "@/lib/store";
+import { getAccounts, addEvent, sendWebhook, queueCommand } from "@/lib/store";
 import { verify } from "@/lib/jwt";
 
 async function requireAuth(request: NextRequest): Promise<boolean> {
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "COMMAND REQUIRED" }, { status: 400 });
         }
 
-        const accounts = getAccounts();
+        const accounts = await getAccounts();
         let targets = accounts;
 
         if (!all && accountIds && Array.isArray(accountIds)) {
@@ -34,13 +34,16 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "NO TARGETS" }, { status: 400 });
         }
 
-        // Log the command for each target
+        // Queue command and log for each target
         for (const account of targets) {
-            addEvent({
+            queueCommand(account.id, command);
+            await addEvent({
+                id: crypto.randomUUID(),
                 type: "command",
                 accountId: account.id,
                 username: account.username,
                 message: `Command "${command}" sent to ${account.username}`,
+                timestamp: Date.now(),
             });
         }
 

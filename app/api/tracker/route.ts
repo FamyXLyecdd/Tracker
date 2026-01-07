@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-    updateAccount,
+    addOrUpdateAccount,
     getAccount,
     removeAccount,
     addEvent,
@@ -26,13 +26,12 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "INVALID_API_KEY" }, { status: 401 });
         }
 
-        const accountId = `${apiKey}-${accountData.userId}`;
+        const accountId = `${apiKey.slice(0, 8)}-${accountData.userId}`;
 
         switch (action) {
             case "connect": {
                 const account: TrackedAccount = {
                     id: accountId,
-                    apiKey,
                     username: accountData.username || "Unknown",
                     displayName: accountData.displayName || accountData.username || "Unknown",
                     userId: accountData.userId || 0,
@@ -49,21 +48,24 @@ export async function POST(request: NextRequest) {
                     maxHealth: accountData.maxHealth,
                     walkSpeed: accountData.walkSpeed,
                     jumpPower: accountData.jumpPower,
+                    idleTime: accountData.idleTime || 0,
                 };
 
-                updateAccount(account);
+                await addOrUpdateAccount(account);
 
-                addEvent({
+                await addEvent({
+                    id: crypto.randomUUID(),
                     type: "connect",
                     accountId: account.id,
                     username: account.username,
                     message: `${account.username} connected from ${account.gameName}`,
+                    timestamp: Date.now(),
                 });
 
                 await sendWebhook(
                     "🟢 CONNECTED",
                     `**${account.username}** is now online`,
-                    0x00ff00, // Green
+                    0x00ff00,
                     [
                         { name: "Game", value: account.gameName || "Unknown", inline: true },
                         { name: "Server ID", value: account.jobId ? `\`${account.jobId.slice(0, 8)}...\`` : "N/A", inline: true },
@@ -76,7 +78,7 @@ export async function POST(request: NextRequest) {
             }
 
             case "heartbeat": {
-                const existing = getAccount(accountId);
+                const existing = await getAccount(accountId);
 
                 if (existing) {
                     existing.lastHeartbeat = Date.now();
@@ -91,7 +93,8 @@ export async function POST(request: NextRequest) {
                     existing.maxHealth = accountData.maxHealth ?? existing.maxHealth;
                     existing.walkSpeed = accountData.walkSpeed ?? existing.walkSpeed;
                     existing.jumpPower = accountData.jumpPower ?? existing.jumpPower;
-                    updateAccount(existing);
+                    existing.idleTime = accountData.idleTime ?? existing.idleTime;
+                    await addOrUpdateAccount(existing);
                 }
 
                 // Get and clear pending commands for this account
@@ -99,19 +102,21 @@ export async function POST(request: NextRequest) {
 
                 return NextResponse.json({
                     success: true,
-                    commands // Return pending commands to execute
+                    commands
                 });
             }
 
             case "disconnect": {
-                const existing = getAccount(accountId);
+                const existing = await getAccount(accountId);
 
                 if (existing) {
-                    addEvent({
+                    await addEvent({
+                        id: crypto.randomUUID(),
                         type: "disconnect",
                         accountId: existing.id,
                         username: existing.username,
                         message: `${existing.username} disconnected`,
+                        timestamp: Date.now(),
                     });
 
                     await sendWebhook(
@@ -120,7 +125,7 @@ export async function POST(request: NextRequest) {
                         0xff3333
                     );
 
-                    removeAccount(accountId);
+                    await removeAccount(existing.userId);
                 }
 
                 return NextResponse.json({ success: true });
@@ -149,7 +154,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: "USER_ID_REQUIRED" }, { status: 400 });
     }
 
-    const accountId = `${apiKey}-${userId}`;
+    const accountId = `${apiKey.slice(0, 8)}-${userId}`;
     const commands = getAndClearCommands(accountId);
 
     return NextResponse.json({ commands });

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getWebhookUrl, setWebhookUrl } from "@/lib/store";
+import { getWebhookUrl } from "@/lib/store";
 import { verify } from "@/lib/jwt";
 
+// Middleware to verify auth
 async function requireAuth(request: NextRequest): Promise<boolean> {
     const authHeader = request.headers.get("authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) return false;
@@ -11,37 +12,31 @@ async function requireAuth(request: NextRequest): Promise<boolean> {
     return payload !== null;
 }
 
+// GET - Get current webhook URL (masked)
 export async function GET(request: NextRequest) {
     if (!(await requireAuth(request))) {
         return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
     }
 
+    const url = getWebhookUrl();
+    // Mask the webhook URL for security
+    const masked = url ? url.slice(0, 50) + "..." : "";
+
     return NextResponse.json({
-        url: getWebhookUrl(),
+        webhook: masked,
+        isSet: !!url,
+        readonly: true // Indicate that webhook cannot be changed
     });
 }
 
+// POST - Webhook is hardcoded, cannot be changed
 export async function POST(request: NextRequest) {
     if (!(await requireAuth(request))) {
         return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
     }
 
-    try {
-        const { url } = await request.json();
-
-        if (url && typeof url === "string") {
-            // Validate Discord webhook URL format
-            if (!url.startsWith("https://discord.com/api/webhooks/") &&
-                !url.startsWith("https://discordapp.com/api/webhooks/")) {
-                return NextResponse.json({ error: "INVALID WEBHOOK URL" }, { status: 400 });
-            }
-            setWebhookUrl(url);
-        } else {
-            setWebhookUrl(null);
-        }
-
-        return NextResponse.json({ success: true, url: getWebhookUrl() });
-    } catch {
-        return NextResponse.json({ error: "INVALID REQUEST" }, { status: 400 });
-    }
+    return NextResponse.json({
+        error: "WEBHOOK_READONLY",
+        message: "Webhook URL is hardcoded and cannot be changed"
+    }, { status: 403 });
 }

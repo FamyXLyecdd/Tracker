@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAccounts, getEvents, removeAccount, addEvent, sendWebhook, queueCommand } from "@/lib/store";
+import {
+    getAccounts,
+    setAccounts,
+    getEventsLimited,
+    addEvent,
+    sendWebhook,
+    queueCommand
+} from "@/lib/store";
 import { verify } from "@/lib/jwt";
 
 // Middleware to verify auth
@@ -18,27 +25,38 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
     }
 
-    const accounts = getAccounts();
-    const events = getEvents(50);
+    const accounts = await getAccounts();
+    const events = await getEventsLimited(50);
 
-    // Mark accounts as offline if no heartbeat in 60 seconds
+    // Mark accounts as offline if no heartbeat in 45 seconds
     const now = Date.now();
-    accounts.forEach(account => {
+    let updated = false;
+
+    for (const account of accounts) {
         if (now - account.lastHeartbeat > 45000 && account.status === "online") {
             account.status = "offline";
-            addEvent({
+            updated = true;
+
+            await addEvent({
+                id: crypto.randomUUID(),
                 type: "disconnect",
                 accountId: account.id,
                 username: account.username,
                 message: `${account.username} timed out (no heartbeat)`,
+                timestamp: Date.now(),
             });
-            sendWebhook(
+
+            await sendWebhook(
                 "🔴 TIMEOUT",
                 `**${account.username}** stopped sending signals`,
                 0xff3333
             );
         }
-    });
+    }
+
+    if (updated) {
+        await setAccounts(accounts);
+    }
 
     return NextResponse.json({
         accounts,
@@ -65,7 +83,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "ACCOUNT IDS REQUIRED" }, { status: 400 });
         }
 
-        const accounts = getAccounts();
+        const accounts = await getAccounts();
         const targets = accounts.filter(a => accountIds.includes(a.id) && a.status === "online");
 
         if (targets.length === 0) {
@@ -75,11 +93,13 @@ export async function POST(request: NextRequest) {
         // Queue command for each target
         for (const account of targets) {
             queueCommand(account.id, command);
-            addEvent({
+            await addEvent({
+                id: crypto.randomUUID(),
                 type: "command",
                 accountId: account.id,
                 username: account.username,
                 message: `Command "${command}" queued for ${account.username}`,
+                timestamp: Date.now(),
             });
         }
 
@@ -100,7 +120,7 @@ export async function POST(request: NextRequest) {
     }
 }
 
-// DELETE - Kick an account (queue kick command + remove from list)
+// DELETE - Kick an account (queue kick command)
 export async function DELETE(request: NextRequest) {
     if (!(await requireAuth(request))) {
         return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
@@ -113,25 +133,24 @@ export async function DELETE(request: NextRequest) {
         return NextResponse.json({ error: "ACCOUNT ID REQUIRED" }, { status: 400 });
     }
 
-    const accounts = getAccounts();
+    const accounts = await getAccounts();
     const account = accounts.find(a => a.id === accountId);
 
     if (!account) {
         return NextResponse.json({ error: "ACCOUNT NOT FOUND" }, { status: 404 });
     }
 
-    // Queue kick command before removing
+    // Queue kick command
     queueCommand(account.id, "kick");
 
-    addEvent({
+    await addEvent({
+        id: crypto.randomUUID(),
         type: "command",
         accountId: account.id,
         username: account.username,
         message: `Kick command sent to ${account.username}`,
+        timestamp: Date.now(),
     });
-
-    // Don't remove immediately - let the next heartbeat pick up the kick command
-    // The Lua script will disconnect after receiving the kick
 
     await sendWebhook(
         "🔴 KICK QUEUED",
