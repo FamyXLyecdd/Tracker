@@ -4,33 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./dashboard.module.css";
 
-interface TrackedAccount {
-    id: string;
-    username: string;
-    displayName: string;
-    userId: number;
-    placeId: number;
-    jobId: string;
-    gameName: string;
-    status: "online" | "offline" | "idle";
-    fps: number;
-    ping: number;
-    lastHeartbeat: number;
-    connectedAt: number;
-    position?: { x: number; y: number; z: number };
-    health?: number;
-    maxHealth?: number;
-    walkSpeed?: number;
-    jumpPower?: number;
-}
-
-interface TrackerEvent {
-    id: string;
-    type: string;
-    username: string;
-    message: string;
-    timestamp: number;
-}
+import type { TrackedAccount, TrackerEvent } from "@/lib/store";
 
 export default function DashboardPage() {
     const [accounts, setAccounts] = useState<TrackedAccount[]>([]);
