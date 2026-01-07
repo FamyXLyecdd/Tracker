@@ -307,34 +307,22 @@ end
 -- AUTO-EXECUTE ON TELEPORT (Queue on Teleport)
 -- ============================================
 local function autoExecute()
-    local qot = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport) or (request and request.queue_on_teleport)
+    -- Find queue_on_teleport from various executors
+    local qot = queue_on_teleport 
+        or (syn and syn.queue_on_teleport) 
+        or (fluxus and fluxus.queue_on_teleport)
+        or (getgenv and getgenv().queue_on_teleport)
+    
     if qot then
-        -- Construct the loadstring URL from the SERVER_URL (replacing /api/tracker with /api/script)
-        local scriptUrl = SERVER_URL:gsub("/api/tracker", "/api/script?key=" .. API_KEY)
-        qot('if not _G.ZaynLoaded then _G.ZaynLoaded = true; loadstring(game:HttpGet("' .. scriptUrl .. '"))() end')
+        pcall(function()
+            local scriptUrl = SERVER_URL:gsub("/api/tracker", "/api/script?key=" .. API_KEY)
+            qot('if not _G.ZaynLoaded then _G.ZaynLoaded = true; loadstring(game:HttpGet("' .. scriptUrl .. '"))() end')
+        end)
     end
 end
 
-if TeleportService then
-    TeleportService.TeleportInitFailed:Connect(function()
-        -- Re-queue if teleport fails? No, script is still running.
-    end)
-    
-    -- Hook into teleport
-    local oldNamecall
-    oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-        local args = {...}
-        local method = getnamecallmethod()
-        
-        if self == TeleportService and (method == "Teleport" or method == "TeleportToPlaceInstance") then
-            autoExecute()
-        end
-        return oldNamecall(self, ...)
-    end)
-    
-    -- Also just call it once just in case the hook fails/isn't supported
-    autoExecute()
-end
+-- Just call autoExecute once on load to queue for future teleports
+pcall(autoExecute)
 
 -- ============================================
 -- HEARTBEAT
