@@ -6,6 +6,9 @@ export const metadata: Metadata = {
   description: "Roblox Account Tracking System",
 };
 
+export const dynamic = "force-dynamic";
+
+
 export default function RootLayout({
   children,
 }: Readonly<{
