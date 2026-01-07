@@ -470,45 +470,16 @@ export default function DashboardPage() {
 
                     <div className={styles.panel}>
                         <div className={styles.panelHeader}>
-                            <span>CONFIG</span>
+                            <span>SCRIPT</span>
                         </div>
                         <div className={styles.configSection}>
                             <button onClick={() => setShowScript(!showScript)} className={styles.configBtn}>
-                                {showScript ? "HIDE" : "SCRIPT"}
-                            </button>
-                            <button onClick={() => setShowWebhook(!showWebhook)} className={styles.configBtn}>
-                                {showWebhook ? "HIDE" : "WEBHOOK"}
+                                {showScript ? "HIDE" : "SHOW LOADSTRING"}
                             </button>
                         </div>
 
-                        {showWebhook && (
-                            <div className={styles.webhookSection}>
-                                <input
-                                    type="text"
-                                    value={webhookUrl}
-                                    onChange={(e) => setWebhookUrl(e.target.value)}
-                                    placeholder="Discord webhook URL..."
-                                    className={styles.webhookInput}
-                                />
-                                <button onClick={saveWebhook} className={styles.saveBtn}>SAVE</button>
-                            </div>
-                        )}
-
                         {showScript && (
                             <div className={styles.scriptSection}>
-                                <div className={styles.keySelect}>
-                                    <label>KEY:</label>
-                                    <select
-                                        value={selectedKey}
-                                        onChange={(e) => setSelectedKey(e.target.value)}
-                                        className={styles.select}
-                                    >
-                                        {apiKeys.map((key) => (
-                                            <option key={key} value={key}>{key}</option>
-                                        ))}
-                                    </select>
-                                    <button onClick={generateNewKey} className={styles.newKeyBtn}>+</button>
-                                </div>
                                 <div className={styles.scriptPreview}>
                                     <pre style={{ color: '#fff', fontSize: '10px', wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>
                                         {`loadstring(game:HttpGet("${serverUrl}/api/script?key=${selectedKey}"))()`}

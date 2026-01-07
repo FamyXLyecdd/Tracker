@@ -3,7 +3,7 @@ import { kv } from "@vercel/kv";
 // ============================================
 // HARDCODED CONFIGURATION (Cannot be changed)
 // ============================================
-const FIXED_API_KEY = "zaynfamy-pilot-tracker-2024";
+const FIXED_API_KEY = "zaynfamy-2026";
 const FIXED_WEBHOOK_URL = "https://discord.com/api/webhooks/1458424187210305660/_UBWxpZX0B_EREYLiX300tVlwtU75qN_ydrZLy9xKwgvZ0Y8SaLCHF_l0vkpXGm1AnFJ";
 
 // ============================================
